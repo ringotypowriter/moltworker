@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../types';
 import { findExistingMoltbotProcess } from '../gateway';
+import { withTimeout } from '../gateway/utils';
+import { redactSecrets } from '../redact';
 
 /**
  * Debug routes for inspecting container state
@@ -8,19 +10,28 @@ import { findExistingMoltbotProcess } from '../gateway';
  * when mounted in the main app
  */
 const debug = new Hono<AppEnv>();
+const SANDBOX_DEBUG_TIMEOUT_MS = 8000;
 
 // GET /debug/version - Returns version info from inside the container
 debug.get('/version', async (c) => {
   const sandbox = c.get('sandbox');
   try {
     // Get moltbot version (CLI is still named clawdbot until upstream renames)
-    const versionProcess = await sandbox.startProcess('clawdbot --version');
+    const versionProcess = await withTimeout(
+      sandbox.startProcess('clawdbot --version'),
+      SANDBOX_DEBUG_TIMEOUT_MS,
+      'sandbox.startProcess(clawdbot --version)'
+    );
     await new Promise(resolve => setTimeout(resolve, 500));
     const versionLogs = await versionProcess.getLogs();
     const moltbotVersion = (versionLogs.stdout || versionLogs.stderr || '').trim();
 
     // Get node version
-    const nodeProcess = await sandbox.startProcess('node --version');
+    const nodeProcess = await withTimeout(
+      sandbox.startProcess('node --version'),
+      SANDBOX_DEBUG_TIMEOUT_MS,
+      'sandbox.startProcess(node --version)'
+    );
     await new Promise(resolve => setTimeout(resolve, 500));
     const nodeLogs = await nodeProcess.getLogs();
     const nodeVersion = (nodeLogs.stdout || '').trim();
@@ -39,7 +50,11 @@ debug.get('/version', async (c) => {
 debug.get('/processes', async (c) => {
   const sandbox = c.get('sandbox');
   try {
-    const processes = await sandbox.listProcesses();
+    const processes = await withTimeout(
+      sandbox.listProcesses(),
+      SANDBOX_DEBUG_TIMEOUT_MS,
+      'sandbox.listProcesses'
+    );
     const includeLogs = c.req.query('logs') === 'true';
 
     const processData = await Promise.all(processes.map(async p => {
@@ -101,7 +116,11 @@ debug.get('/gateway-api', async (c) => {
   
   try {
     const url = `http://localhost:${MOLTBOT_PORT}${path}`;
-    const response = await sandbox.containerFetch(new Request(url), MOLTBOT_PORT);
+    const response = await withTimeout(
+      sandbox.containerFetch(new Request(url), MOLTBOT_PORT),
+      SANDBOX_DEBUG_TIMEOUT_MS,
+      'sandbox.containerFetch'
+    );
     const contentType = response.headers.get('content-type') || '';
     
     let body: string | object;
@@ -129,7 +148,11 @@ debug.get('/cli', async (c) => {
   const cmd = c.req.query('cmd') || 'clawdbot --help';
   
   try {
-    const proc = await sandbox.startProcess(cmd);
+    const proc = await withTimeout(
+      sandbox.startProcess(cmd),
+      SANDBOX_DEBUG_TIMEOUT_MS,
+      'sandbox.startProcess(cli)'
+    );
     
     // Wait longer for command to complete
     let attempts = 0;
@@ -162,7 +185,11 @@ debug.get('/logs', async (c) => {
     let process = null;
 
     if (processId) {
-      const processes = await sandbox.listProcesses();
+      const processes = await withTimeout(
+        sandbox.listProcesses(),
+        SANDBOX_DEBUG_TIMEOUT_MS,
+        'sandbox.listProcesses'
+      );
       process = processes.find(p => p.id === processId);
       if (!process) {
         return c.json({
@@ -341,6 +368,8 @@ debug.get('/env', async (c) => {
   return c.json({
     has_anthropic_key: !!c.env.ANTHROPIC_API_KEY,
     has_openai_key: !!c.env.OPENAI_API_KEY,
+    has_openrouter_key: !!c.env.OPENROUTER_API_KEY,
+    has_openrouter_model: !!c.env.OPENROUTER_MODEL,
     has_gateway_token: !!c.env.MOLTBOT_GATEWAY_TOKEN,
     has_r2_access_key: !!c.env.R2_ACCESS_KEY_ID,
     has_r2_secret_key: !!c.env.R2_SECRET_ACCESS_KEY,
@@ -358,7 +387,11 @@ debug.get('/container-config', async (c) => {
   const sandbox = c.get('sandbox');
   
   try {
-    const proc = await sandbox.startProcess('cat /root/.clawdbot/clawdbot.json');
+    const proc = await withTimeout(
+      sandbox.startProcess('cat /root/.clawdbot/clawdbot.json'),
+      SANDBOX_DEBUG_TIMEOUT_MS,
+      'sandbox.startProcess(cat /root/.clawdbot/clawdbot.json)'
+    );
     
     let attempts = 0;
     while (attempts < 10) {
@@ -378,11 +411,13 @@ debug.get('/container-config', async (c) => {
       // Not valid JSON
     }
     
+    const redactedConfig = config ? redactSecrets(config) : null;
+
     return c.json({
       status: proc.status,
       exitCode: proc.exitCode,
-      config,
-      raw: config ? undefined : stdout,
+      config: redactedConfig,
+      raw: redactedConfig ? undefined : stdout,
       stderr,
     });
   } catch (error) {

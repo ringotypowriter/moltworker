@@ -3,6 +3,11 @@
 
 ANTHROPIC_API_KEY=sk-ant-...
 
+# Optional OpenRouter configuration
+# OPENROUTER_API_KEY=sk-or-...
+# OPENROUTER_MODEL=anthropic/claude-sonnet-4-5
+# OPENROUTER_MODEL_ALIAS=OpenRouter Sonnet
+
 # Local development mode - skips Cloudflare Access auth and bypasses device pairing
 # DEV_MODE=true
 

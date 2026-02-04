@@ -1,7 +1,16 @@
 import { describe, it, expect, vi } from 'vitest';
-import { findExistingMoltbotProcess } from './process';
+import { ensureMoltbotGateway, findExistingMoltbotProcess } from './process';
 import type { Sandbox, Process } from '@cloudflare/sandbox';
 import { createMockSandbox } from '../test-utils';
+import { createMockEnv } from '../test-utils';
+
+vi.mock('./env', () => ({
+  buildEnvVars: vi.fn().mockReturnValue({}),
+}));
+
+vi.mock('./r2', () => ({
+  mountR2Storage: vi.fn().mockResolvedValue(true),
+}));
 
 // Helper to create a full mock process (with methods needed for process tests)
 function createFullMockProcess(overrides: Partial<Process> = {}): Process {
@@ -118,5 +127,37 @@ describe('findExistingMoltbotProcess', () => {
     
     const result = await findExistingMoltbotProcess(sandbox);
     expect(result?.id).toBe('gateway-1');
+  });
+});
+
+describe('ensureMoltbotGateway', () => {
+  it('returns process when port becomes ready before exit', async () => {
+    const process = createFullMockProcess({
+      waitForPort: vi.fn().mockResolvedValue(undefined),
+      waitForExit: vi.fn().mockImplementation(() => new Promise(() => {})),
+    });
+    const sandbox = {
+      listProcesses: vi.fn().mockResolvedValue([]),
+      startProcess: vi.fn().mockResolvedValue(process),
+    } as unknown as Sandbox;
+    const env = createMockEnv();
+
+    const result = await ensureMoltbotGateway(sandbox, env);
+    expect(result).toBe(process);
+  });
+
+  it('throws quickly when process exits before port is ready', async () => {
+    const process = createFullMockProcess({
+      waitForPort: vi.fn().mockImplementation(() => new Promise(() => {})),
+      waitForExit: vi.fn().mockResolvedValue({ exitCode: 1 }),
+      getLogs: vi.fn().mockResolvedValue({ stdout: '', stderr: 'boom' }),
+    });
+    const sandbox = {
+      listProcesses: vi.fn().mockResolvedValue([]),
+      startProcess: vi.fn().mockResolvedValue(process),
+    } as unknown as Sandbox;
+    const env = createMockEnv();
+
+    await expect(ensureMoltbotGateway(sandbox, env)).rejects.toThrow('exited before port was ready');
   });
 });

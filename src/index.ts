@@ -52,7 +52,7 @@ export { Sandbox };
  * Validate required environment variables.
  * Returns an array of missing variable descriptions, or empty array if all are set.
  */
-function validateRequiredEnv(env: MoltbotEnv): string[] {
+export function validateRequiredEnv(env: MoltbotEnv): string[] {
   const missing: string[] = [];
 
   if (!env.MOLTBOT_GATEWAY_TOKEN) {
@@ -67,15 +67,23 @@ function validateRequiredEnv(env: MoltbotEnv): string[] {
     missing.push('CF_ACCESS_AUD');
   }
 
+  // OpenRouter configuration (alternative provider)
+  if (env.OPENROUTER_API_KEY && !env.OPENROUTER_MODEL) {
+    missing.push('OPENROUTER_MODEL (required when using OPENROUTER_API_KEY)');
+  }
+  if (env.OPENROUTER_MODEL && !env.OPENROUTER_API_KEY) {
+    missing.push('OPENROUTER_API_KEY (required when using OPENROUTER_MODEL)');
+  }
+
   // Check for AI Gateway or direct Anthropic configuration
   if (env.AI_GATEWAY_API_KEY) {
     // AI Gateway requires both API key and base URL
     if (!env.AI_GATEWAY_BASE_URL) {
       missing.push('AI_GATEWAY_BASE_URL (required when using AI_GATEWAY_API_KEY)');
     }
-  } else if (!env.ANTHROPIC_API_KEY) {
-    // Direct Anthropic access requires API key
-    missing.push('ANTHROPIC_API_KEY or AI_GATEWAY_API_KEY');
+  } else if (!env.ANTHROPIC_API_KEY && !env.OPENROUTER_API_KEY) {
+    // Direct Anthropic access requires API key (unless OpenRouter is configured)
+    missing.push('ANTHROPIC_API_KEY or AI_GATEWAY_API_KEY or OPENROUTER_API_KEY');
   }
 
   return missing;

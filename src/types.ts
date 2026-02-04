@@ -14,7 +14,15 @@ export interface MoltbotEnv {
   ANTHROPIC_API_KEY?: string;
   ANTHROPIC_BASE_URL?: string;
   OPENAI_API_KEY?: string;
+  OPENROUTER_API_KEY?: string;
+  OPENROUTER_MODEL?: string;
+  OPENROUTER_MODEL_ALIAS?: string;
   MOLTBOT_GATEWAY_TOKEN?: string; // Gateway token (mapped to CLAWDBOT_GATEWAY_TOKEN for container)
+
+  // Optional passthrough settings for container env vars
+  ENV_PASSTHROUGH?: string; // Comma-separated list of env keys to forward to container
+  ENV_PASSTHROUGH_PREFIXES?: string; // Comma-separated list of prefixes to forward (e.g. "OPENROUTER_,MYAPP_")
+  ENV_PASSTHROUGH_ALL?: string; // Set to 'true' to forward all string env vars
 
   CLAWDBOT_BIND_MODE?: string;
   DEV_MODE?: string; // Set to 'true' for local dev (skips CF Access auth + moltbot device pairing)

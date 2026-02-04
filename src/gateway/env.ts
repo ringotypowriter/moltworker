@@ -30,6 +30,15 @@ export function buildEnvVars(env: MoltbotEnv): Record<string, string> {
   if (!envVars.OPENAI_API_KEY && env.OPENAI_API_KEY) {
     envVars.OPENAI_API_KEY = env.OPENAI_API_KEY;
   }
+  if (env.OPENROUTER_API_KEY) {
+    envVars.OPENROUTER_API_KEY = env.OPENROUTER_API_KEY;
+  }
+  if (env.OPENROUTER_MODEL) {
+    envVars.OPENROUTER_MODEL = env.OPENROUTER_MODEL;
+  }
+  if (env.OPENROUTER_MODEL_ALIAS) {
+    envVars.OPENROUTER_MODEL_ALIAS = env.OPENROUTER_MODEL_ALIAS;
+  }
 
   // Pass base URL (used by start-moltbot.sh to determine provider)
   if (normalizedBaseUrl) {
@@ -55,6 +64,16 @@ export function buildEnvVars(env: MoltbotEnv): Record<string, string> {
   if (env.SLACK_APP_TOKEN) envVars.SLACK_APP_TOKEN = env.SLACK_APP_TOKEN;
   if (env.CDP_SECRET) envVars.CDP_SECRET = env.CDP_SECRET;
   if (env.WORKER_URL) envVars.WORKER_URL = env.WORKER_URL;
+
+  const denylist = new Set(['Sandbox', 'ASSETS', 'MOLTBOT_BUCKET', 'BROWSER']);
+  const rawEnv = env as Record<string, unknown>;
+
+  for (const [key, value] of Object.entries(rawEnv)) {
+    if (denylist.has(key)) continue;
+    if (key in envVars) continue;
+    if (typeof value !== 'string' || value.length === 0) continue;
+    envVars[key] = value;
+  }
 
   return envVars;
 }

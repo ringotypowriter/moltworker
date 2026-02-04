@@ -85,6 +85,18 @@ describe('buildEnvVars', () => {
     expect(result.OPENAI_API_KEY).toBe('sk-openai-key');
   });
 
+  it('includes OPENROUTER_API_KEY and OPENROUTER_MODEL when set directly', () => {
+    const env = createMockEnv({
+      OPENROUTER_API_KEY: 'sk-or-key',
+      OPENROUTER_MODEL: 'anthropic/claude-sonnet-4-5',
+      OPENROUTER_MODEL_ALIAS: 'OR Sonnet',
+    });
+    const result = buildEnvVars(env);
+    expect(result.OPENROUTER_API_KEY).toBe('sk-or-key');
+    expect(result.OPENROUTER_MODEL).toBe('anthropic/claude-sonnet-4-5');
+    expect(result.OPENROUTER_MODEL_ALIAS).toBe('OR Sonnet');
+  });
+
   it('maps MOLTBOT_GATEWAY_TOKEN to CLAWDBOT_GATEWAY_TOKEN for container', () => {
     const env = createMockEnv({ MOLTBOT_GATEWAY_TOKEN: 'my-token' });
     const result = buildEnvVars(env);
@@ -169,5 +181,25 @@ describe('buildEnvVars', () => {
     expect(result.OPENAI_API_KEY).toBe('sk-gateway-key');
     expect(result.OPENAI_BASE_URL).toBe('https://gateway.ai.cloudflare.com/v1/123/my-gw/openai');
     expect(result.AI_GATEWAY_BASE_URL).toBe('https://gateway.ai.cloudflare.com/v1/123/my-gw/openai');
+  });
+
+  it('passes through all string env vars by default', () => {
+    const env = createMockEnv({
+      CUSTOM_ENV: 'custom',
+      ANOTHER_ENV: 'value',
+    });
+    const result = buildEnvVars(env);
+    expect(result.CUSTOM_ENV).toBe('custom');
+    expect(result.ANOTHER_ENV).toBe('value');
+  });
+
+  it('does not override explicitly mapped env vars during passthrough', () => {
+    const env = createMockEnv({
+      OPENROUTER_API_KEY: 'sk-or-key',
+      OPENROUTER_MODEL: 'anthropic/claude-sonnet-4-5',
+    });
+    const result = buildEnvVars(env);
+    expect(result.OPENROUTER_API_KEY).toBe('sk-or-key');
+    expect(result.OPENROUTER_MODEL).toBe('anthropic/claude-sonnet-4-5');
   });
 });

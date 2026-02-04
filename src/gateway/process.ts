@@ -98,7 +98,25 @@ export async function ensureMoltbotGateway(sandbox: Sandbox, env: MoltbotEnv): P
   // Wait for the gateway to be ready
   try {
     console.log('[Gateway] Waiting for Moltbot gateway to be ready on port', MOLTBOT_PORT);
-    await process.waitForPort(MOLTBOT_PORT, { mode: 'tcp', timeout: STARTUP_TIMEOUT_MS });
+    const waitForPort = process.waitForPort(MOLTBOT_PORT, { mode: 'tcp', timeout: STARTUP_TIMEOUT_MS }).then(() => ({
+      kind: 'ready' as const,
+    }));
+    const waitForExit = process.waitForExit
+      ? process.waitForExit(STARTUP_TIMEOUT_MS).then((result) => ({
+          kind: 'exit' as const,
+          exitCode: result.exitCode,
+        }))
+      : null;
+
+    const outcome = await (waitForExit ? Promise.race([waitForPort, waitForExit]) : waitForPort);
+    if (outcome.kind === 'exit') {
+      const logs = await process.getLogs();
+      const stderr = logs.stderr || '(empty)';
+      const stdout = logs.stdout || '(empty)';
+      throw new Error(
+        `Moltbot gateway exited before port was ready (exitCode=${outcome.exitCode}). Stderr: ${stderr} Stdout: ${stdout}`
+      );
+    }
     console.log('[Gateway] Moltbot gateway is ready!');
 
     const logs = await process.getLogs();
